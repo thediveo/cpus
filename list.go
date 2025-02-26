@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"strings"
 
+	"slices"
+
 	"github.com/thediveo/faf"
 )
 
@@ -26,7 +28,8 @@ import (
 type List [][2]uint
 
 // String returns the CPU list in textual format, with the individual ranges
-// “x-y” separated by “,” and single CPU ranges collapsed into “x”.
+// “x-y” separated by “,” and single CPU ranges collapsed into “x” (instead of
+// “x-x”).
 func (l List) String() string {
 	var b strings.Builder
 	for idx, cpurange := range l {
@@ -102,17 +105,16 @@ func (l List) Set() Set {
 	var s Set
 	for i := range l {
 		r := l[len(l)-i-1]
-		s = s.SetRange(r[0], r[1])
+		s = s.AddRange(r[0], r[1])
 	}
 	return s
 }
 
-// Overlap returns true if the current List overlaps with the specified second
-// List.
+// IsOverlapping returns true if this List overlaps with another List.
 //
 // Both lists must be in canonical form where all ranges are ordered from lowest
 // to highest and never overlap within the same list.
-func (l List) Overlap(another List) bool {
+func (l List) IsOverlapping(another List) bool {
 	// We assume canonical list form here, that is, all ranges within a list are
 	// ordered from lowest to highest and never overlapping within a list.
 	r2idx := 0
@@ -129,8 +131,8 @@ func (l List) Overlap(another List) bool {
 				return true
 			}
 			// When the current range from the second list now is beyond the
-			// current range from the first list we need to take advance to the
-			// next range from that first list and then rinse and repeat.
+			// current range from the first list we need to advance to the next
+			// range from that first list and then rinse and repeat.
 			if another[r2idx][0] > r1[1] {
 				break
 			}
@@ -142,10 +144,43 @@ func (l List) Overlap(another List) bool {
 	return false
 }
 
+// Overlap returns the overlap of this List with another List as a new List. If
+// the range lists are not overlapping, then an empty new List is returned.
+func (l List) Overlap(another List) List {
+	overlaps := List{}
+	r2idx := 0
+	for _, r1 := range l {
+		for {
+			// If we're exhausted our second range list to compare with, we're
+			// done: there can't be any more overlap.
+			if r2idx >= len(another) {
+				return overlaps
+			}
+			// If we have overlap, then add the range where the lists overlap to
+			// the result. In contrast to just detecting an overlap we then
+			// carry on, as there might be more overlaps in the store for us.
+			if r1[1] >= another[r2idx][0] && r1[0] <= another[r2idx][1] {
+				from := max(r1[0], another[r2idx][0])
+				to := min(r1[1], another[r2idx][1])
+				overlaps = append(overlaps, [2]uint{from, to})
+			}
+			// Depending on whether the second ranges end lies beyond the first
+			// ranges end we either need to move on to the next first range, or
+			// next second range, respectively.
+			if another[r2idx][1] > r1[1] {
+				break
+			}
+			r2idx++
+		}
+	}
+	return overlaps
+}
+
 // Remove the lowest CPU from the specified List, returning the CPU number
-// together with the List of remaining CPUs. The remaining List may or may not
-// be the same List object as before. Remove panics if the CPU list is already
-// empty.
+// together with a new List of remaining CPUs.
+//
+// The Remove operation is useful to pick individual and available (“online”)
+// CPUs after first getting the List of CPU affinities for a task/process.
 func (l List) Remove() (cpu uint, remaining List) {
 	if len(l) == 0 {
 		panic("cannot remove from empty List")
@@ -155,11 +190,10 @@ func (l List) Remove() (cpu uint, remaining List) {
 		// There will still be CPUs in the lowest range after we've removed the
 		// CPU at the beginning of the range...
 		cpu = lowestRange[0]
-		l[0][0]++
-		return cpu, l
+		return cpu, append(List{[2]uint{cpu + 1, lowestRange[1]}}, l[1:]...)
 	}
 	// We've exhausted the lowest range after we've removed the last CPU from
 	// that range, so we return the remaining ranges, throwing away the now
 	// empty lowest range...
-	return lowestRange[0], l[1:]
+	return lowestRange[0], slices.Clone(l[1:])
 }

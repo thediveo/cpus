@@ -16,7 +16,6 @@ package cpus
 
 import (
 	"fmt"
-	"slices"
 	"sync/atomic"
 	"syscall"
 	"unsafe"
@@ -57,20 +56,45 @@ func (s Set) IsSet(cpu uint) bool {
 	return s[setBitIndex(cpu)]&setBitMask(cpu) != 0
 }
 
-// SetRange adds the CPU from the specified range, returning an updated Set.
-// This updated Set may or may not be the original Set.
-func (s Set) SetRange(from, to uint) Set {
+// AddRange adds the CPU(s) from the specified range, returning a new Set.
+func (s Set) AddRange(from, to uint) Set {
 	if from > to {
 		panic(fmt.Sprintf("invalid range %d-%d", from, to))
 	}
-	if to >= uint(len(s))*bitsperword {
-		s = slices.Grow(s, setBitIndex(to)-len(s)+1)
-		s = s[:cap(s)]
-	}
+	setLen := max(to/bitsperword+1, uint(len(s))*bitsperword)
+	set := make(Set, setLen)
+	copy(set[0:len(s)], s)
 	for cpu := from; cpu <= to; cpu++ {
-		s[setBitIndex(cpu)] |= setBitMask(cpu)
+		set[setBitIndex(cpu)] |= setBitMask(cpu)
 	}
-	return s
+	return set
+}
+
+// IsOverlapping returns true if this Set and another overlap, otherwise false.
+func (s Set) IsOverlapping(another Set) bool {
+	for idx := range min(len(s), len(another)) {
+		if s[idx]&another[idx] != 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// Overlap returns the overlap of this Set with another as a new Set.
+func (s Set) Overlap(another Set) Set {
+	l := min(len(s), len(another))
+	overlap := make(Set, l)
+	for idx := range l {
+		overlap[idx] = s[idx] & another[idx]
+	}
+	return overlap
+}
+
+// PinTask pins the process/task identified by tid to the CPUs specified in this
+// Set. If it fails, it returns an error instead. PinTask is a convenience
+// wrapper around calling [SetAffinity] with the specified Set.
+func (s Set) PinTask(tid int) error {
+	return SetAffinity(tid, s)
 }
 
 // Affinity returns the affinity CPUList (list of CPU ranges) of the
@@ -127,6 +151,8 @@ func Affinity(tid int) (Set, error) {
 
 // SetAffinity sets the CPU affinities for the specified task/process.
 // Otherwise, it returns an error. It is an error trying to set no affinities.
+//
+// See also the equivalent [Set.PinTask].
 func SetAffinity(tid int, cpus Set) error {
 	if len(cpus) == 0 {
 		return syscall.EINVAL
@@ -141,7 +167,7 @@ func SetAffinity(tid int, cpus Set) error {
 
 // String returns the CPUs in this set in textual list format. In list format,
 // individual CPU ranges “x-y” are separated by “,”, and single CPU ranges
-// collapsed into “x”.
+// collapsed into “x” (instead of “x-x”).
 func (s Set) String() string {
 	return s.List().String()
 }

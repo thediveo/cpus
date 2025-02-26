@@ -86,12 +86,12 @@ var _ = Describe("cpu sets", func() {
 
 		affs := Successful(Affinity(0))
 		oneonly, _ := affs.List().Remove()
-		Expect(SetAffinity(0, Set{}.SetRange(oneonly, oneonly))).To(Succeed())
+		Expect(Set{}.AddRange(oneonly, oneonly).PinTask(0)).To(Succeed())
 
 		reducedaffs := Successful(Affinity(0)).List()
 		Expect(reducedaffs).To(Equal(List{[2]uint{oneonly, oneonly}}))
 
-		Expect(SetAffinity(0, affs)).To(Succeed())
+		Expect(affs.PinTask(0)).To(Succeed())
 	})
 
 	It("cannot set empty affinities", func() {
@@ -132,16 +132,39 @@ var _ = Describe("cpu sets", func() {
 
 	})
 
+	DescribeTable("testing for overlaps",
+		func(l1, l2 string, overlap bool) {
+			s1 := Successful(NewList([]byte(l1))).Set()
+			s2 := Successful(NewList([]byte(l2))).Set()
+			Expect(s1.IsOverlapping(s2)).To(Equal(overlap))
+		},
+		Entry(nil, "", "", false),
+		Entry(nil, "1-3", "5-7", false),
+		Entry(nil, "1-3", "100-111", false),
+		Entry(nil, "98-101", "100-200", true),
+	)
+
+	DescribeTable("calculating overlap",
+		func(l1, l2 string, overlap string) {
+			s1 := Successful(NewList([]byte(l1))).Set()
+			s2 := Successful(NewList([]byte(l2))).Set()
+			Expect(s1.Overlap(s2).List().String()).To(Equal(overlap))
+		},
+		Entry(nil, "", "", ""),
+		Entry(nil, "1-3", "5-7", ""),
+		Entry(nil, "1-5", "3-9", "3-5"),
+	)
+
 	When("setting ranges", func() {
 
 		It("sets CPU ranges", func() {
-			Expect(Set{}.SetRange(1, 1).SetRange(63, 65).String()).To(Equal("1,63-65"))
-			Expect(Set{0, 0, 0}.SetRange(63, 65).String()).To(Equal("63-65"))
+			Expect(Set{}.AddRange(1, 1).AddRange(63, 65).String()).To(Equal("1,63-65"))
+			Expect(Set{0, 0, 0}.AddRange(63, 65).String()).To(Equal("63-65"))
 		})
 
 		It("panics on invalid range", func() {
 			Expect(func() {
-				Set{}.SetRange(3, 1)
+				Set{}.AddRange(3, 1)
 			}).To(Panic())
 		})
 
