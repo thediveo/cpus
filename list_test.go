@@ -72,10 +72,10 @@ var _ = Describe("cpu lists", func() {
 		Expect(Successful(NewList([]byte("3,5,666"))).Set().String()).To(Equal("3,5,666"))
 	})
 
-	DescribeTable("overlapping lists",
+	DescribeTable("testing for overlaps",
 		func(l1, l2 string, overlapping bool) {
 			Expect(Successful(NewList([]byte(l1))).
-				Overlap(Successful(NewList([]byte(l2))))).To(Equal(overlapping))
+				IsOverlapping(Successful(NewList([]byte(l2))))).To(Equal(overlapping))
 		},
 		Entry(nil, "", "", false),
 		Entry(nil, "1", "5", false),
@@ -84,6 +84,20 @@ var _ = Describe("cpu lists", func() {
 		Entry(nil, "1,7,19", "3-5,6-8", true),
 		Entry(nil, "3-5,6-8", "1,7,19", true),
 		Entry(nil, "7", "1-3,5-999", true),
+		Entry(nil, "1-3,5-999", "7", true),
+	)
+
+	DescribeTable("calculating overlap",
+		func(l1, l2 string, overlap string) {
+			Expect(Successful(NewList([]byte(l1))).Overlap(
+				Successful(NewList([]byte(l2)))).String()).To(Equal(overlap))
+		},
+		Entry(nil, "", "", ""),
+		Entry(nil, "1-3", "", ""),
+		Entry(nil, "", "5-7", ""),
+		Entry(nil, "1-20", "19-33", "19-20"),
+		Entry(nil, "1-20", "2-3,5-7,19-22", "2-3,5-7,19-20"),
+		Entry(nil, "2-3,5-7,19-22", "1-20", "2-3,5-7,19-20"),
 	)
 
 	DescribeTable("removing CPUs",
@@ -97,6 +111,23 @@ var _ = Describe("cpu lists", func() {
 		Entry(nil, "1-3", 1, "2-3"),
 		Entry(nil, "5", 5, ""),
 	)
+
+	It("doesn't modify the original List's slice elements", func() {
+		orig := List{[2]uint{1, 3}, [2]uint{5, 6}}
+
+		start := make(List, len(orig))
+		copy(start, orig)
+		cpu, remains := start.Remove()
+		Expect(cpu).To(Equal(uint(1)))
+		Expect(start).To(Equal(orig))
+		Expect(remains[0]).To(Equal([2]uint{2, 3}))
+
+		for _, cpuno := range []uint{2, 3, 5, 6} {
+			cpu, remains = remains.Remove()
+			Expect(cpu).To(Equal(cpuno))
+		}
+		Expect(remains).To(BeEmpty())
+	})
 
 	It("panics when there are no cpus to remove", func() {
 		Expect(func() {

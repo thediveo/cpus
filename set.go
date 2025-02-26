@@ -70,22 +70,22 @@ func (s Set) AddRange(from, to uint) Set {
 	return set
 }
 
-// IsOverlapping returns true if Set s1 and s2 overlap, otherwise false.
-func (s1 Set) IsOverlapping(s2 Set) bool {
-	for idx := range min(len(s1), len(s2)) {
-		if s1[idx]&s2[idx] != 0 {
+// IsOverlapping returns true if this Set and another overlap, otherwise false.
+func (s Set) IsOverlapping(another Set) bool {
+	for idx := range min(len(s), len(another)) {
+		if s[idx]&another[idx] != 0 {
 			return true
 		}
 	}
 	return false
 }
 
-// Overlap returns the overlap of s1 with s2 as a new Set.
-func (s1 Set) Overlap(s2 Set) Set {
-	l := min(len(s1), len(s2))
+// Overlap returns the overlap of this Set with another as a new Set.
+func (s Set) Overlap(another Set) Set {
+	l := min(len(s), len(another))
 	overlap := make(Set, l)
 	for idx := range l {
-		overlap[idx] = s1[idx] & s2[idx]
+		overlap[idx] = s[idx] & another[idx]
 	}
 	return overlap
 }
@@ -151,6 +151,8 @@ func Affinity(tid int) (Set, error) {
 
 // SetAffinity sets the CPU affinities for the specified task/process.
 // Otherwise, it returns an error. It is an error trying to set no affinities.
+//
+// See also the equivalent [Set.PinTask].
 func SetAffinity(tid int, cpus Set) error {
 	if len(cpus) == 0 {
 		return syscall.EINVAL
@@ -165,7 +167,7 @@ func SetAffinity(tid int, cpus Set) error {
 
 // String returns the CPUs in this set in textual list format. In list format,
 // individual CPU ranges “x-y” are separated by “,”, and single CPU ranges
-// collapsed into “x”.
+// collapsed into “x” (instead of “x-x”).
 func (s Set) String() string {
 	return s.List().String()
 }
