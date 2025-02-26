@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"slices"
 	"sync/atomic"
+	"syscall"
 	"unsafe"
 
 	"golang.org/x/sys/unix"
@@ -122,6 +123,20 @@ func Affinity(tid int) (Set, error) {
 		break
 	}
 	return set, nil
+}
+
+// SetAffinity sets the CPU affinities for the specified task/process.
+// Otherwise, it returns an error. It is an error trying to set no affinities.
+func SetAffinity(tid int, cpus Set) error {
+	if len(cpus) == 0 {
+		return syscall.EINVAL
+	}
+	_, _, e := unix.RawSyscall(unix.SYS_SCHED_SETAFFINITY,
+		uintptr(tid), uintptr(uint64(len(cpus))*wordbytesize), uintptr(unsafe.Pointer(&cpus[0])))
+	if e != 0 {
+		return e
+	}
+	return nil
 }
 
 // String returns the CPUs in this set in textual list format. In list format,

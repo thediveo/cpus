@@ -17,6 +17,7 @@ package cpus
 import (
 	"bytes"
 	"os"
+	"runtime"
 
 	. "github.com/onsi/ginkgo/v2/dsl/core"
 	. "github.com/onsi/ginkgo/v2/dsl/table"
@@ -78,6 +79,24 @@ var _ = Describe("cpu sets", func() {
 			allowedList = Successful(NewList(line[len(prefix) : len(line)-1]))
 		}
 		Expect(cpulist).To(Equal(allowedList))
+	})
+
+	It("changes this process's CPU affinity", func() {
+		runtime.LockOSThread() // don't unlock, throw away the tainted task
+
+		affs := Successful(Affinity(0))
+		oneonly, _ := affs.List().Remove()
+		Expect(SetAffinity(0, Set{}.SetRange(oneonly, oneonly))).To(Succeed())
+
+		reducedaffs := Successful(Affinity(0)).List()
+		Expect(reducedaffs).To(Equal(List{[2]uint{oneonly, oneonly}}))
+
+		Expect(SetAffinity(0, affs)).To(Succeed())
+	})
+
+	It("cannot set empty affinities", func() {
+		Expect(SetAffinity(0, Set{})).NotTo(Succeed())
+		Expect(SetAffinity(0, Set{0})).NotTo(Succeed())
 	})
 
 	Context("textual representation", func() {
