@@ -17,6 +17,7 @@ package cpus
 import (
 	"bytes"
 	"os"
+	"runtime"
 
 	. "github.com/onsi/ginkgo/v2/dsl/core"
 	. "github.com/onsi/ginkgo/v2/dsl/table"
@@ -80,6 +81,24 @@ var _ = Describe("cpu sets", func() {
 		Expect(cpulist).To(Equal(allowedList))
 	})
 
+	It("changes this process's CPU affinity", func() {
+		runtime.LockOSThread() // don't unlock, throw away the tainted task
+
+		affs := Successful(Affinity(0))
+		oneonly, _ := affs.List().Remove()
+		Expect(SetAffinity(0, Set{}.SetRange(oneonly, oneonly))).To(Succeed())
+
+		reducedaffs := Successful(Affinity(0)).List()
+		Expect(reducedaffs).To(Equal(List{[2]uint{oneonly, oneonly}}))
+
+		Expect(SetAffinity(0, affs)).To(Succeed())
+	})
+
+	It("cannot set empty affinities", func() {
+		Expect(SetAffinity(0, Set{})).NotTo(Succeed())
+		Expect(SetAffinity(0, Set{0})).NotTo(Succeed())
+	})
+
 	Context("textual representation", func() {
 
 		It("handles the empty set correctly", func() {
@@ -106,10 +125,24 @@ var _ = Describe("cpu sets", func() {
 		})
 
 		It("correctly tests", func() {
-			Expect(Set{2}.IsSet(-1)).To(BeFalse())
 			Expect(Set{2}.IsSet(0)).To(BeFalse())
 			Expect(Set{2}.IsSet(1)).To(BeTrue())
 			Expect(Set{2}.IsSet(666)).To(BeFalse())
+		})
+
+	})
+
+	When("setting ranges", func() {
+
+		It("sets CPU ranges", func() {
+			Expect(Set{}.SetRange(1, 1).SetRange(63, 65).String()).To(Equal("1,63-65"))
+			Expect(Set{0, 0, 0}.SetRange(63, 65).String()).To(Equal("63-65"))
+		})
+
+		It("panics on invalid range", func() {
+			Expect(func() {
+				Set{}.SetRange(3, 1)
+			}).To(Panic())
 		})
 
 	})

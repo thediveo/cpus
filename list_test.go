@@ -18,6 +18,7 @@ import (
 	. "github.com/onsi/ginkgo/v2/dsl/core"
 	. "github.com/onsi/ginkgo/v2/dsl/table"
 	. "github.com/onsi/gomega"
+	. "github.com/thediveo/success"
 )
 
 var _ = Describe("cpu lists", func() {
@@ -64,6 +65,43 @@ var _ = Describe("cpu lists", func() {
 			Entry(nil, "0-0abc", "expected ','"),
 		)
 
+	})
+
+	It("converts a list into a set", func() {
+		Expect(List{}.Set().String()).To(BeEmpty())
+		Expect(Successful(NewList([]byte("3,5,666"))).Set().String()).To(Equal("3,5,666"))
+	})
+
+	DescribeTable("overlapping lists",
+		func(l1, l2 string, overlapping bool) {
+			Expect(Successful(NewList([]byte(l1))).
+				Overlap(Successful(NewList([]byte(l2))))).To(Equal(overlapping))
+		},
+		Entry(nil, "", "", false),
+		Entry(nil, "1", "5", false),
+		Entry(nil, "1-2", "5-7", false),
+		Entry(nil, "5-7", "1-2", false),
+		Entry(nil, "1,7,19", "3-5,6-8", true),
+		Entry(nil, "3-5,6-8", "1,7,19", true),
+		Entry(nil, "7", "1-3,5-999", true),
+	)
+
+	DescribeTable("removing CPUs",
+		func(l string, cpu int, remainers string) {
+			c, rem := Successful(NewList([]byte(l))).Remove()
+			Expect(c).To(Equal(uint(cpu)))
+			Expect(rem.String()).To(Equal(remainers))
+		},
+		Entry(nil, "1,3", 1, "3"),
+		Entry(nil, "1-2", 1, "2"),
+		Entry(nil, "1-3", 1, "2-3"),
+		Entry(nil, "5", 5, ""),
+	)
+
+	It("panics when there are no cpus to remove", func() {
+		Expect(func() {
+			_, _ = List{}.Remove()
+		}).To(Panic())
 	})
 
 })

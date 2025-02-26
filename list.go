@@ -42,7 +42,8 @@ func (l List) String() string {
 	return b.String()
 }
 
-// NewList returns a new CPU List for the given textual list format.
+// NewList returns a new CPU List for the given textual list format. If the text
+// is malformed then an error is returned instead.
 func NewList(b []byte) (List, error) {
 	bs := faf.NewBytestring(b)
 	l := List{}
@@ -90,4 +91,75 @@ func NewList(b []byte) (List, error) {
 			return nil, errors.New("expected '-' or ','")
 		}
 	}
+}
+
+// Set returns the CPU Set corresponding with this list.
+func (l List) Set() Set {
+	if len(l) == 0 {
+		return Set{}
+	}
+	// Do last range first to allocate only once.
+	var s Set
+	for i := range l {
+		r := l[len(l)-i-1]
+		s = s.SetRange(r[0], r[1])
+	}
+	return s
+}
+
+// Overlap returns true if the current List overlaps with the specified second
+// List.
+//
+// Both lists must be in canonical form where all ranges are ordered from lowest
+// to highest and never overlap within the same list.
+func (l List) Overlap(another List) bool {
+	// We assume canonical list form here, that is, all ranges within a list are
+	// ordered from lowest to highest and never overlapping within a list.
+	r2idx := 0
+	for _, r1 := range l {
+		for {
+			// If we're exhausted our second range list to compare with, we're
+			// done: there can't be any overlap.
+			if r2idx >= len(another) {
+				return false
+			}
+			// We're positively done if the current first range and the current
+			// second range overlap.
+			if r1[1] >= another[r2idx][0] && r1[0] <= another[r2idx][1] {
+				return true
+			}
+			// When the current range from the second list now is beyond the
+			// current range from the first list we need to take advance to the
+			// next range from that first list and then rinse and repeat.
+			if another[r2idx][0] > r1[1] {
+				break
+			}
+			// Process ranges from the second list while we've yet to catch up
+			// to the current first list range.
+			r2idx++
+		}
+	}
+	return false
+}
+
+// Remove the lowest CPU from the specified List, returning the CPU number
+// together with the List of remaining CPUs. The remaining List may or may not
+// be the same List object as before. Remove panics if the CPU list is already
+// empty.
+func (l List) Remove() (cpu uint, remaining List) {
+	if len(l) == 0 {
+		panic("cannot remove from empty List")
+	}
+	lowestRange := l[0]
+	if lowestRange[0] < lowestRange[1] {
+		// There will still be CPUs in the lowest range after we've removed the
+		// CPU at the beginning of the range...
+		cpu = lowestRange[0]
+		l[0][0]++
+		return cpu, l
+	}
+	// We've exhausted the lowest range after we've removed the last CPU from
+	// that range, so we return the remaining ranges, throwing away the now
+	// empty lowest range...
+	return lowestRange[0], l[1:]
 }
