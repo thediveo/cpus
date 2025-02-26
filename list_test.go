@@ -61,6 +61,7 @@ var _ = Describe("cpu lists", func() {
 			},
 			Entry(nil, "abc", "expected unsigned integer number"),
 			Entry(nil, "0abc", "expected '-' or ','"),
+			Entry(nil, "42-", "expected unsigned integer number"),
 			Entry(nil, "1-z", "expected unsigned integer number"),
 			Entry(nil, "0-0abc", "expected ','"),
 		)
