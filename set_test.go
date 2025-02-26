@@ -16,6 +16,7 @@ package cpus
 
 import (
 	"bytes"
+	"iter"
 	"os"
 	"runtime"
 
@@ -24,6 +25,22 @@ import (
 	. "github.com/onsi/gomega"
 	. "github.com/thediveo/success"
 )
+
+func Lines(b []byte) iter.Seq[[]byte] {
+	return func(yield func([]byte) bool) {
+		for len(b) > 0 {
+			var line []byte
+			if nlIdx := bytes.IndexByte(b, '\n'); nlIdx >= 0 {
+				line, b = b[:nlIdx+1], b[nlIdx+1:]
+			} else {
+				line, b = b, nil
+			}
+			if !yield(line[:len(line):len(line)]) {
+				return
+			}
+		}
+	}
+}
 
 var _ = Describe("cpu sets", func() {
 
@@ -72,7 +89,7 @@ var _ = Describe("cpu sets", func() {
 
 		var prefix = []byte("Cpus_allowed_list:\t")
 		var allowedList List
-		for line := range bytes.Lines(Successful(os.ReadFile("/proc/self/status"))) {
+		for line := range Lines(Successful(os.ReadFile("/proc/self/status"))) {
 			if !bytes.HasPrefix(line, prefix) {
 				continue
 			}
