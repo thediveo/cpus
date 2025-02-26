@@ -48,41 +48,43 @@ func (l List) String() string {
 // NewList returns a new CPU List for the given textual list format. If the text
 // is malformed then an error is returned instead.
 func NewList(b []byte) (List, error) {
-	bs := faf.NewBytestring(b)
+	bstr := faf.NewBytestring(b)
+	// nota bene: not using make(...) saves us somehow 3 allocs overall and
+	// decreases memory consumption. compiler optimization??
 	l := List{}
 	for {
 		// nothing more, we're at the end of text/line, so we're successfully
 		// done.
-		if bs.EOL() {
+		if bstr.EOL() {
 			return l, nil
 		}
 		// we now expect a CPU number and if there is nothing else following,
 		// we're also done, adding the CPU number as a single CPU range to our
 		// list.
-		from, ok := bs.Uint64()
+		from, ok := bstr.Uint64()
 		if !ok {
 			return nil, errors.New("expected unsigned integer number")
 		}
-		if bs.EOL() {
+		if bstr.EOL() {
 			return append(l, [2]uint{uint(from), uint(from)}), nil
 		}
 		// Either this is a from-to range or another range should follow...
-		switch ch, _ := bs.Next(); ch {
+		switch ch, _ := bstr.Next(); ch {
 		case '-':
 			// a range, so get the end of the range and then add the range to
 			// our list. If nothing else follows, then we're done.
-			to, ok := bs.Uint64()
+			to, ok := bstr.Uint64()
 			if !ok {
 				return nil, errors.New("expected unsigned integer number")
 			}
 			l = append(l, [2]uint{uint(from), uint(to)})
-			if bs.EOL() {
+			if bstr.EOL() {
 				return l, nil
 			}
 			// another CPU number (or range) is expected to follow, separated by
 			// ",", so we check for a necessary comma. Then we start over with
 			// the next CPU number or range.
-			ch, _ = bs.Next()
+			ch, _ = bstr.Next()
 			if ch != ',' {
 				return nil, errors.New("expected ','")
 			}
