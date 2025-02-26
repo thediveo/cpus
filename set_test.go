@@ -106,10 +106,24 @@ var _ = Describe("cpu sets", func() {
 		})
 
 		It("correctly tests", func() {
-			Expect(Set{2}.IsSet(-1)).To(BeFalse())
 			Expect(Set{2}.IsSet(0)).To(BeFalse())
 			Expect(Set{2}.IsSet(1)).To(BeTrue())
 			Expect(Set{2}.IsSet(666)).To(BeFalse())
+		})
+
+	})
+
+	When("setting ranges", func() {
+
+		It("sets CPU ranges", func() {
+			Expect(Set{}.SetRange(1, 1).SetRange(63, 65).String()).To(Equal("1,63-65"))
+			Expect(Set{0, 0, 0}.SetRange(63, 65).String()).To(Equal("63-65"))
+		})
+
+		It("panics on invalid range", func() {
+			Expect(func() {
+				Set{}.SetRange(3, 1)
+			}).To(Panic())
 		})
 
 	})

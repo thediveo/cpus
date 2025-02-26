@@ -15,6 +15,8 @@
 package cpus
 
 import (
+	"fmt"
+	"slices"
 	"sync/atomic"
 	"unsafe"
 
@@ -32,26 +34,42 @@ type Set []uint64
 // [unix.CPUSet] that Go's [unix.SchedGetaffinity] uses.
 var setsize atomic.Uint64
 var wordbytesize = uint64(unsafe.Sizeof(Set{0}[0]))
-var bitsperword = int(wordbytesize * 8)
+var bitsperword = uint(wordbytesize * 8)
 
 func init() {
 	setsize.Store(1)
 }
 
-func setBitIndex(cpu int) int {
-	return cpu / bitsperword
+func setBitIndex(cpu uint) int {
+	return int(cpu / bitsperword)
 }
 
-func setBitMask(cpu int) uint64 {
+func setBitMask(cpu uint) uint64 {
 	return uint64(1) << (cpu % bitsperword)
 }
 
 // IsSet reports whether cpu is in this CPU set.
-func (s Set) IsSet(cpu int) bool {
-	if cpu < 0 || cpu >= len(s)*bitsperword {
+func (s Set) IsSet(cpu uint) bool {
+	if cpu >= uint(len(s))*bitsperword {
 		return false
 	}
 	return s[setBitIndex(cpu)]&setBitMask(cpu) != 0
+}
+
+// SetRange adds the CPU from the specified range, returning an updated Set.
+// This updated Set may or may not be the original Set.
+func (s Set) SetRange(from, to uint) Set {
+	if from > to {
+		panic(fmt.Sprintf("invalid range %d-%d", from, to))
+	}
+	if to >= uint(len(s))*bitsperword {
+		s = slices.Grow(s, setBitIndex(to)-len(s)+1)
+		s = s[:cap(s)]
+	}
+	for cpu := from; cpu <= to; cpu++ {
+		s[setBitIndex(cpu)] |= setBitMask(cpu)
+	}
+	return s
 }
 
 // Affinity returns the affinity CPUList (list of CPU ranges) of the
