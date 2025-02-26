@@ -16,7 +16,6 @@ package cpus
 
 import (
 	"fmt"
-	"slices"
 	"sync/atomic"
 	"syscall"
 	"unsafe"
@@ -57,20 +56,45 @@ func (s Set) IsSet(cpu uint) bool {
 	return s[setBitIndex(cpu)]&setBitMask(cpu) != 0
 }
 
-// SetRange adds the CPU from the specified range, returning an updated Set.
-// This updated Set may or may not be the original Set.
-func (s Set) SetRange(from, to uint) Set {
+// AddRange adds the CPU(s) from the specified range, returning a new Set.
+func (s Set) AddRange(from, to uint) Set {
 	if from > to {
 		panic(fmt.Sprintf("invalid range %d-%d", from, to))
 	}
-	if to >= uint(len(s))*bitsperword {
-		s = slices.Grow(s, setBitIndex(to)-len(s)+1)
-		s = s[:cap(s)]
-	}
+	setLen := max(to/bitsperword+1, uint(len(s))*bitsperword)
+	set := make(Set, setLen)
+	copy(set[0:len(s)], s)
 	for cpu := from; cpu <= to; cpu++ {
-		s[setBitIndex(cpu)] |= setBitMask(cpu)
+		set[setBitIndex(cpu)] |= setBitMask(cpu)
 	}
-	return s
+	return set
+}
+
+// IsOverlapping returns true if Set s1 and s2 overlap, otherwise false.
+func (s1 Set) IsOverlapping(s2 Set) bool {
+	for idx := range min(len(s1), len(s2)) {
+		if s1[idx]&s2[idx] != 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// Overlap returns the overlap of s1 with s2 as a new Set.
+func (s1 Set) Overlap(s2 Set) Set {
+	l := min(len(s1), len(s2))
+	overlap := make(Set, l)
+	for idx := range l {
+		overlap[idx] = s1[idx] & s2[idx]
+	}
+	return overlap
+}
+
+// PinTask pins the process/task identified by tid to the CPUs specified in this
+// Set. If it fails, it returns an error instead. PinTask is a convenience
+// wrapper around calling [SetAffinity] with the specified Set.
+func (s Set) PinTask(tid int) error {
+	return SetAffinity(tid, s)
 }
 
 // Affinity returns the affinity CPUList (list of CPU ranges) of the
