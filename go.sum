@@ -16,8 +16,8 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/stretchr/testify v1.8.4 h1:CcVxjf3Q8PM0mHUKJCdn+eZZtm5yQwehR5yeSVQQcUk=
 github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
-github.com/thediveo/faf v0.2.0 h1:o5TvGzetAISGvssLShZQX5a4FIUyKQ9c9fr2vGs34Xg=
-github.com/thediveo/faf v0.2.0/go.mod h1:Hxn++Q5aiiJfIuv+rq1MT/kOdsuwtqkHvwFHSBtGlj4=
+github.com/thediveo/faf v0.2.1 h1:3wTb6H8cTHMha8T9o28dW5ILArOw054k3fkeEeLnL3U=
+github.com/thediveo/faf v0.2.1/go.mod h1:Hxn++Q5aiiJfIuv+rq1MT/kOdsuwtqkHvwFHSBtGlj4=
 github.com/thediveo/fdooze v0.3.1 h1:T5lARTBZXdDIwdsMNgiwpEY3NT40k1WTRlkoKgk8K+0=
 github.com/thediveo/fdooze v0.3.1/go.mod h1:wf5DDE9ch9MqqoS5ofU5+tOOsZyvp5qrJzQjVIGXUTk=
 github.com/thediveo/success v1.0.3 h1:jaBpZ5ETfmCo9U3CRDtWPhtXQg3iW3beZH4ioLMR5RQ=

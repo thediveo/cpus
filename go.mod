@@ -6,7 +6,7 @@ toolchain go1.23.6
 
 require (
 	github.com/onsi/ginkgo/v2 v2.22.2
-	github.com/thediveo/faf v0.2.0
+	github.com/thediveo/faf v0.2.1
 	golang.org/x/sys v0.30.0
 )
 
