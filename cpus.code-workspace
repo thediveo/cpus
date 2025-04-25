@@ -12,11 +12,6 @@
 	},
 	"settings": {
 		"go.lintTool": "golangci-lint",
-		"go.testFlags": [
-			"-v",
-			"-args", // https://github.com/golang/vscode-go/issues/2994
-			"--ginkgo.no-color"
-		],
 		"statsBar.memoUsage.format": "$(chip) ${used}/${total} ${unit}, ${percent}%",
 		"statsBar.location": "Right",
 	},
@@ -24,12 +19,20 @@
 		"version": "0.2.0",
 		"configurations": [
 			{
-				"name": "Debug/Test Package",
+				"name": "Test Package",
 				"type": "go",
 				"request": "launch",
-				"mode": "auto",
+				"mode": "test",
 				"program": "${fileDirname}",
-				
+				"args": ["--ginkgo.no-color"],
+				"buildFlags": ["-v"]
+			},	
+			{
+				"name": "Debug Package",
+				"type": "go",
+				"request": "launch",
+				"mode": "debug",
+				"program": "${fileDirname}",
 			}
 		]
 	}
