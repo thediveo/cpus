@@ -172,6 +172,24 @@ var _ = Describe("cpu sets", func() {
 		Entry(nil, "1-5", "3-9", "3-5"),
 	)
 
+	DescribeTable("determining a single CPU in Set",
+		func(l string, trailers bool, cpu int, ok bool) {
+			s := Successful(NewList([]byte(l))).Set()
+			if trailers {
+				// add zero value trailing elements
+				s = append(s, 0, 0)
+			}
+			actcpu, actok := s.Single()
+			Expect(actcpu).To(Equal(uint(cpu)))
+			Expect(actok).To(Equal(ok))
+		},
+		Entry(nil, "", false, 0, false),
+		Entry(nil, "", true, 0, false),
+		Entry(nil, "42,666", false, 0, false),
+		Entry(nil, "2,62", false, 0, false),
+		Entry(nil, "123", true, 123, true),
+	)
+
 	When("setting ranges", func() {
 
 		It("sets CPU ranges", func() {
