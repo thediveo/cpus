@@ -25,11 +25,16 @@ import (
 )
 
 // List is a list of CPU [from...to] ranges. CPU numbers are starting from zero.
+//
+// The behavior of operations on Lists that are not in canonical form is
+// undefined. In the canonical form of a List all its ranges are non-overlapping
+// and in each range the first “from” element must be less or equal to the
+// second “to” element.
 type List [][2]uint
 
 // String returns the CPU list in textual format, with the individual ranges
-// “x-y” separated by “,” and single CPU ranges collapsed into “x” (instead of
-// “x-x”).
+// “x-y” separated by “,” and single CPU ranges collapsed into single CPU
+// numbers “x” instead of an “x-x” range.
 func (l List) String() string {
 	var b strings.Builder
 	for idx, cpurange := range l {
@@ -45,10 +50,28 @@ func (l List) String() string {
 	return b.String()
 }
 
-// NewList returns a new CPU List for the given textual list format. If the text
-// is malformed then an error is returned instead.
-func NewList(b []byte) (List, error) {
-	bstr := faf.NewBytestring(b)
+// NewList returns a new CPU List for the given text. If the text is malformed
+// then an error is returned instead.
+//
+// The list textual format is a sequence of zero or more CPU ranges or single
+// CPU numbers, separated by comma. A CPU range is in the form “from-to”, where
+// “from” and “to” are non-negative CPU numbers separated by a minus sign as the
+// poor-ASCII-people's dash surrogate.
+//
+// Any trailing “\n” (or similar) is also an error.
+//
+// Valid CPU lists:
+//   - “” (empty CPU list)
+//   - “42”
+//   - “1,2,42-666”
+//
+// Invalid CPU lists (non-exhaustive examples):
+//   - “666,” (invalid trailing comma)
+//   - “666,,42” (invalid repeated comma)
+//   - “42-” (missing range end)
+//   - “42,foobar” (garbage)
+func NewList(text []byte) (List, error) {
+	bstr := faf.NewBytestring(text)
 	// nota bene: not using make(...) saves us somehow 3 allocs overall and
 	// decreases memory consumption. compiler optimization??
 	l := List{}
@@ -76,6 +99,9 @@ func NewList(b []byte) (List, error) {
 			to, ok := bstr.Uint64()
 			if !ok {
 				return nil, errors.New("expected unsigned integer number")
+			}
+			if from > to {
+				return nil, errors.New("invalid inverted range")
 			}
 			l = append(l, [2]uint{uint(from), uint(to)})
 			if bstr.EOL() {

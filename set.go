@@ -16,6 +16,7 @@ package cpus
 
 import (
 	"fmt"
+	"math/bits"
 	"sync/atomic"
 	"syscall"
 	"unsafe"
@@ -23,8 +24,14 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// Set is a CPU bit string, such as used for CPU affinity masks. See also
-// [sched_getaffinity(2)].
+// Set is a CPU bit string, such as used for CPU affinity masks. The first
+// element represents the CPU numbers 0–63, with bit 0 (LSB) for CPU 0, bit 63
+// (MSB) for CPU 63. If present, the second element represents CPU numbers
+// 64–127, with bit 0 (LSB) corresponding with CPU 64 and bit 63 (MSB)
+// corresponding with CPU 127, and so on. A zero length Set represents an empty
+// Set, as do non-zero length Sets with only zero value elements.
+//
+// See also [sched_getaffinity(2)].
 //
 // [sched_getaffinity(2)]: https://man7.org/linux/man-pages/man2/sched_getaffinity.2.html
 type Set []uint64
@@ -90,6 +97,37 @@ func (s Set) Overlap(another Set) Set {
 	return overlap
 }
 
+// Single returns the single CPU in a Set, or otherwise false if the Set is
+// either empty or specifies multiple CPUs.
+func (s Set) Single() (cpu uint, ok bool) {
+	if len(s) == 0 {
+		return 0, false
+	}
+	idx := 0
+	// get to the first non-zero element
+	for idx < len(s) {
+		if s[idx] != 0 {
+			// everyone only one CPU please...
+			el := s[idx]
+			if el == 0 || el&(el-1) != 0 {
+				return 0, false
+			}
+			cpu = uint(bits.Len64(el) - 1 + idx*64)
+			// ...finally ensure that there is not any further non-zero element
+			idx++
+			for idx < len(s) {
+				if s[idx] != 0 {
+					return 0, false
+				}
+				idx++
+			}
+			return cpu, true
+		}
+		idx++
+	}
+	return 0, false
+}
+
 // PinTask pins the process/task identified by tid to the CPUs specified in this
 // Set. If it fails, it returns an error instead. PinTask is a convenience
 // wrapper around calling [SetAffinity] with the specified Set.
@@ -149,10 +187,11 @@ func Affinity(tid int) (Set, error) {
 	return set, nil
 }
 
-// SetAffinity sets the CPU affinities for the specified task/process.
-// Otherwise, it returns an error. It is an error trying to set no affinities.
+// SetAffinity sets the CPU affinities for the specified task/process, returning
+// nil on success. Otherwise, it returns an error. It is an error trying to
+// remove any CPU affinity by specifying an effectively empty Set.
 //
-// See also the equivalent [Set.PinTask].
+// See also the functional equivalent [Set.PinTask].
 func SetAffinity(tid int, cpus Set) error {
 	if len(cpus) == 0 {
 		return syscall.EINVAL
