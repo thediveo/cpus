@@ -14,6 +14,7 @@
 		"go.lintTool": "golangci-lint",
 		"go.testFlags": [
 			"-v",
+			"-args", // https://github.com/golang/vscode-go/issues/2994
 			"--ginkgo.no-color"
 		],
 		"statsBar.memoUsage.format": "$(chip) ${used}/${total} ${unit}, ${percent}%",
