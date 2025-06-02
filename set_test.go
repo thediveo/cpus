@@ -203,6 +203,27 @@ var _ = Describe("cpu sets", func() {
 			}).To(Panic())
 		})
 
+		DescribeTable("allocates just the bare minimum of words",
+			func(from, to int, expected int) {
+				set := Set{}.AddRange(uint(from), uint(to))
+				Expect(set).To(HaveLen(expected))
+			},
+			Entry(nil, 2, 63, 1),
+			Entry(nil, 126, 127, 2),
+			Entry(nil, 128, 128, 3),
+		)
+
 	})
+
+	DescribeTable("systemd D-Bus CPU set byte arrays",
+		func(list string, expected []byte) {
+			l := Successful(NewList([]byte(list)))
+			actual := l.Set().SystemdDbusBytes()
+			Expect(actual).To(Equal(expected))
+		},
+		Entry(nil, "", []byte{}),
+		Entry(nil, "1-3", []byte{0x0e}),
+		Entry(nil, "0,4,63-64", []byte{0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x01}),
+	)
 
 })
