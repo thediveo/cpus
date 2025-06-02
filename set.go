@@ -15,8 +15,10 @@
 package cpus
 
 import (
+	"bytes"
 	"fmt"
 	"math/bits"
+	"slices"
 	"sync/atomic"
 	"syscall"
 	"unsafe"
@@ -314,4 +316,28 @@ findNextCPUInWord:
 			cpuwordmask <<= 1
 		}
 	}
+}
+
+// SystemDbusBytes returns the set as a slice of bytes in little-endian format
+// as required by systemd's D-Bus API.
+//
+// Please note that the byte slice is always in little-endian format with CPUs
+// 0-7 in the first byte, 8-15 in the second byte, and so on, regardless of the
+// host endianess.
+func (s Set) SystemdDbusBytes() []byte {
+	b := make([]byte, 0, len(s)*int(wordbytesize))
+	for cpuwordidx := range s {
+		cpuword := s[len(s)-1-cpuwordidx]
+		b = append(b,
+			byte(cpuword>>56),
+			byte(cpuword>>48),
+			byte(cpuword>>40),
+			byte(cpuword>>32),
+			byte(cpuword>>24),
+			byte(cpuword>>16),
+			byte(cpuword>>8),
+			byte(cpuword))
+	}
+	slices.Reverse(b)
+	return bytes.TrimRight(b, "\000")
 }
