@@ -124,6 +124,33 @@ func NewList(text []byte) (List, error) {
 	}
 }
 
+// Contains reports whether cpu is in this CPU list.
+func (l List) Contains(cpu uint) bool {
+	for _, span := range l {
+		if (span[0] <= cpu) && (cpu <= span[1]) {
+			return true
+		}
+	}
+	return false
+}
+
+// Count returns the number of CPUs in this list.
+func (l List) Count() uint {
+	count := uint(0)
+	for _, span := range l {
+		count += span[1] - span[0] + 1
+	}
+	return count
+}
+
+// Equal returns true if both CPU lists are either nil or empty, or contain the
+// same CPUs. The lists must be in canonical form.
+func (l List) Equal(another List) bool {
+	// since the range array elements are also comparable, we can simply pass
+	// the job onto slices.Equal; cheap win.
+	return slices.Equal(l, another)
+}
+
 // Set returns the CPU Set corresponding with this list.
 func (l List) Set() Set {
 	if len(l) == 0 {

@@ -28,8 +28,7 @@ import (
 // For background information, see also [How CPU topology info is exported via
 // sysfs] in the Linux kernel documentation.
 //
-// [How CPU topology info is exported via sysfs]:
-// https://www.kernel.org/doc/html/latest/admin-guide/cputopology.html#
+// [How CPU topology info is exported via sysfs]: https://www.kernel.org/doc/html/latest/admin-guide/cputopology.html
 func Online() List {
 	return online("/")
 }
