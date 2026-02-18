@@ -74,6 +74,42 @@ var _ = Describe("cpu lists", func() {
 		Expect(Successful(NewList([]byte("3,5,666"))).Set().String()).To(Equal("3,5,666"))
 	})
 
+	DescribeTable("counting CPUs in a list",
+		func(cpus string, expected int) {
+			l := Successful(NewList([]byte(cpus)))
+			Expect(l.Count()).To(Equal(uint(expected)))
+		},
+		Entry(nil, "1-3", 3),
+		Entry(nil, "1,3", 2),
+		Entry(nil, "1-3,5,7,9-12", 9),
+	)
+
+	DescribeTable("testing for specific cpu in a list",
+		func(cpu int, expected bool) {
+			l := Successful(NewList([]byte("1,3,12-99")))
+			Expect(l.Contains(uint(cpu))).To(Equal(expected))
+		},
+		Entry(nil, 0, false),
+		Entry(nil, 2, false),
+		Entry(nil, 100, false),
+		Entry(nil, 1, true),
+		Entry(nil, 12, true),
+		Entry(nil, 50, true),
+		Entry(nil, 99, true),
+	)
+
+	DescribeTable("comparing CPU lists for equality",
+		func(cpusA, cpusB string, expected bool) {
+			lA := Successful(NewList([]byte(cpusA)))
+			lB := Successful(NewList([]byte(cpusB)))
+			Expect(lA.Equal(lB)).To(Equal(expected))
+		},
+		Entry(nil, "", "", true),
+		Entry(nil, "1", "", false),
+		Entry(nil, "1-3", "1-5", false),
+		Entry(nil, "1,3,5-7", "1,3,5-7", true),
+	)
+
 	DescribeTable("testing for overlaps",
 		func(l1, l2 string, overlapping bool) {
 			Expect(Successful(NewList([]byte(l1))).
