@@ -67,25 +67,25 @@ var _ = Describe("cpu sets", func() {
 
 		// range across boundaries
 		Entry("cpus #63-64", Set{1 << 63, 1 << 0}, List{{63, 64}}),
-		Entry("cpus #63-127", Set{1 << 63, ^uint64(0)}, List{{63, 127}}),
+		Entry("cpus #63-127", Set{1 << 63, allOnes}, List{{63, 127}}),
 
 		// multiple all-1s words
-		Entry("cpu #0-127", Set{^uint64(0), ^uint64(0)}, List{{0, 127}}),
+		Entry("cpu #0-127", Set{allOnes, allOnes}, List{{0, 127}}),
 
 		// mixed
-		Entry("cpu #0-64", Set{^uint64(0), 1 << 0}, List{{0, 64}}),
-		Entry("cpu #0-64, 67", Set{^uint64(0), 1<<3 | 1<<0}, List{{0, 64}, {67, 67}}),
-		Entry("cpu #65-127, 129", Set{0, ^uint64(0) - 1, 1 << 1}, List{{65, 127}, {129, 129}}),
+		Entry("cpu #0-64", Set{allOnes, 1 << 0}, List{{0, 64}}),
+		Entry("cpu #0-64, 67", Set{allOnes, 1<<3 | 1<<0}, List{{0, 64}, {67, 67}}),
+		Entry("cpu #65-127, 129", Set{0, allOnes - 1, 1 << 1}, List{{65, 127}, {129, 129}}),
 
 		Entry("b/w", Set{0xaa0}, List{{5, 5}, {7, 7}, {9, 9}, {11, 11}}),
 		Entry("art", Set{0x5a0}, List{{5, 5}, {7, 8}, {10, 10}}),
 	)
 
 	It("gets this process's CPU affinity list, consistent with /proc/self/status data", func() {
-		Expect(wordbytesize).To(Equal(uint64(64 /* bits in uint64 */ / 8 /* bits/byte*/)))
+		Expect(elementBytesSize).To(Equal(uint64(64 /* bits in uint64 */ / 8 /* bits/byte*/)))
 		cpulist := Successful(Affinity(os.Getpid())).List()
 		Expect(cpulist).NotTo(BeEmpty())
-		Expect(setsize.Load()).NotTo(BeZero())
+		Expect(systemSetSize.Load()).NotTo(BeZero())
 
 		var prefix = []byte("Cpus_allowed_list:\t")
 		var allowedList List
@@ -137,8 +137,8 @@ var _ = Describe("cpu sets", func() {
 		})
 
 		It("returns correct bit masks", func() {
-			Expect(setBitMask(32)).To(Equal(uint64(1) << 32))
-			Expect(setBitMask(32 + 2*64)).To(Equal(uint64(1) << 32))
+			Expect(setBitMask(32)).To(Equal(Element(1) << 32))
+			Expect(setBitMask(32 + 2*64)).To(Equal(Element(1) << 32))
 		})
 
 		It("correctly tests", func() {

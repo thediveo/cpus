@@ -36,30 +36,43 @@ import (
 // See also [sched_getaffinity(2)].
 //
 // [sched_getaffinity(2)]: https://man7.org/linux/man-pages/man2/sched_getaffinity.2.html
-type Set []uint64
+type Set []Element
 
-// setsize reflects the dynamically determined size of CPUSets on this system
+// Element is the smallest “atomic” storage block for representing CPUs in a
+// Set bitstream; it is an alias for uint64.
+type Element = uint64
+
+const (
+	elementBytesSize = uint64(unsafe.Sizeof([1]Element{}))
+	elementBitSize   = uint(elementBytesSize * 8)
+
+	allOnes = ^Element(0)
+)
+
+// setBitIndex returns the Element index corresponding with the location of the
+// CPU in the Set.
+func setBitIndex(cpu uint) int {
+	return int(cpu / elementBitSize)
+}
+
+// setBitMask returns the Element bit mask for its Element corresponding with
+// the location of the CPU in the Set.
+func setBitMask(cpu uint) Element {
+	return Element(1) << (cpu % elementBitSize)
+}
+
+// systemSetSize reflects the dynamically determined size of CPUSets on this system
 // (size in uint64 words). This is usually smaller than the fixed-sized
 // [unix.CPUSet] that Go's [unix.SchedGetaffinity] uses.
-var setsize atomic.Uint64
-var wordbytesize = uint64(unsafe.Sizeof(Set{0}[0]))
-var bitsperword = uint(wordbytesize * 8)
+var systemSetSize atomic.Uint64
 
 func init() {
-	setsize.Store(1)
-}
-
-func setBitIndex(cpu uint) int {
-	return int(cpu / bitsperword)
-}
-
-func setBitMask(cpu uint) uint64 {
-	return uint64(1) << (cpu % bitsperword)
+	systemSetSize.Store(1)
 }
 
 // IsSet reports whether cpu is in this CPU set.
 func (s Set) IsSet(cpu uint) bool {
-	if cpu >= uint(len(s))*bitsperword {
+	if cpu >= uint(len(s))*elementBitSize {
 		return false
 	}
 	return s[setBitIndex(cpu)]&setBitMask(cpu) != 0
@@ -70,7 +83,7 @@ func (s Set) AddRange(from, to uint) Set {
 	if from > to {
 		panic(fmt.Sprintf("invalid range %d-%d", from, to))
 	}
-	setLen := max(to/bitsperword+1, uint(len(s))*bitsperword)
+	setLen := max(to/elementBitSize+1, uint(len(s))*elementBitSize)
 	set := make(Set, setLen)
 	copy(set[0:len(s)], s)
 	for cpu := from; cpu <= to; cpu++ {
@@ -114,7 +127,7 @@ func (s Set) Single() (cpu uint, ok bool) {
 			if el == 0 || el&(el-1) != 0 {
 				return 0, false
 			}
-			cpu = uint(bits.Len64(el) - 1 + idx*64)
+			cpu = uint(bits.Len64(uint64(el)) - 1 + idx*64)
 			// ...finally ensure that there is not any further non-zero element
 			idx++
 			for idx < len(s) {
@@ -153,17 +166,19 @@ func (s Set) PinTask(tid int) error {
 func Affinity(tid int) (Set, error) {
 	var set Set
 
-	setlenStart := setsize.Load()
+	setlenStart := systemSetSize.Load()
 	setlen := setlenStart
 	for {
-		set = make([]uint64, setlen)
+		set = make(Set, setlen)
 		// see also:
 		// https://man7.org/linux/man-pages/man2/sched_setaffinity.2.html; we
 		// use RawSyscall here instead of Syscall as we know that
 		// SYS_SCHED_GETAFFINITY does not block, following Go's stdlib
 		// implementation.
 		_, _, e := unix.RawSyscall(unix.SYS_SCHED_GETAFFINITY,
-			uintptr(tid), uintptr(setlen*wordbytesize), uintptr(unsafe.Pointer(&set[0])))
+			uintptr(tid),
+			uintptr(setlen*elementBytesSize),
+			uintptr(unsafe.Pointer(&set[0])))
 		if e != 0 {
 			if e == unix.EINVAL {
 				setlen *= 2
@@ -176,10 +191,10 @@ func Affinity(tid int) (Set, error) {
 		// than what was set as the new set size, or we succeed in setting the
 		// size.
 		for {
-			if setsize.CompareAndSwap(setlenStart, setlen) {
+			if systemSetSize.CompareAndSwap(setlenStart, setlen) {
 				break
 			}
-			setlenStart = setsize.Load()
+			setlenStart = systemSetSize.Load()
 			if setlenStart > setlen {
 				break
 			}
@@ -199,7 +214,7 @@ func SetAffinity(tid int, cpus Set) error {
 		return syscall.EINVAL
 	}
 	_, _, e := unix.RawSyscall(unix.SYS_SCHED_SETAFFINITY,
-		uintptr(tid), uintptr(uint64(len(cpus))*wordbytesize), uintptr(unsafe.Pointer(&cpus[0])))
+		uintptr(tid), uintptr(uint64(len(cpus))*elementBytesSize), uintptr(unsafe.Pointer(&cpus[0])))
 	if e != 0 {
 		return e
 	}
@@ -224,7 +239,7 @@ func (s Set) List() List {
 	cpulist := List{}
 	cpuno := uint(0)
 	cpuwordidx := uint64(0)
-	cpuwordmask := uint64(1)
+	cpuwordmask := Element(1)
 
 findNextCPUInWord:
 	for {
@@ -294,7 +309,7 @@ findNextCPUInWord:
 		}
 		// Try to fast-forward through completely set cpu mask words, where
 		// applicable.
-		for cpuwordidx < setlen && s[cpuwordidx] == ^uint64(0) {
+		for cpuwordidx < setlen && s[cpuwordidx] == allOnes {
 			cpuno += 64
 			cpuwordidx++
 		}
@@ -325,7 +340,7 @@ findNextCPUInWord:
 // 0-7 in the first byte, 8-15 in the second byte, and so on, regardless of the
 // host endianess.
 func (s Set) SystemdDbusBytes() []byte {
-	b := make([]byte, 0, len(s)*int(wordbytesize))
+	b := make([]byte, 0, len(s)*int(elementBytesSize))
 	for cpuwordidx := range s {
 		cpuword := s[len(s)-1-cpuwordidx]
 		b = append(b,
