@@ -17,9 +17,8 @@ package cpus
 import (
 	"errors"
 	"fmt"
-	"strings"
-
 	"slices"
+	"strings"
 
 	"github.com/thediveo/faf"
 )
@@ -42,10 +41,10 @@ func (l List) String() string {
 			b.WriteString(",")
 		}
 		if cpurange[0] == cpurange[1] {
-			b.WriteString(fmt.Sprintf("%d", cpurange[0]))
+			fmt.Fprintf(&b, "%d", cpurange[0])
 			continue
 		}
-		b.WriteString(fmt.Sprintf("%d-%d", cpurange[0], cpurange[1]))
+		fmt.Fprintf(&b, "%d-%d", cpurange[0], cpurange[1])
 	}
 	return b.String()
 }

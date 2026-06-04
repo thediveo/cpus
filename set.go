@@ -190,10 +190,7 @@ func Affinity(tid int) (Set, error) {
 		// upped the set size, retry until we either notice that we're smaller
 		// than what was set as the new set size, or we succeed in setting the
 		// size.
-		for {
-			if systemSetSize.CompareAndSwap(setlenStart, setlen) {
-				break
-			}
+		for !systemSetSize.CompareAndSwap(setlenStart, setlen) {
 			setlenStart = systemSetSize.Load()
 			if setlenStart > setlen {
 				break
@@ -247,10 +244,7 @@ findNextCPUInWord:
 		// any, otherwise stop after we've fallen off the MSB end of the cpu
 		// mask word.
 		if cpuwordmask != 1 {
-			for {
-				if s[cpuwordidx]&cpuwordmask != 0 {
-					break
-				}
+			for s[cpuwordidx]&cpuwordmask == 0 {
 				cpuno++
 				cpuwordmask <<= 1
 				if cpuwordmask == 0 {
@@ -272,10 +266,7 @@ findNextCPUInWord:
 		}
 		// We arrived at a non-zero cpu mask word, so let's now find the first
 		// cpu in it.
-		for {
-			if s[cpuwordidx]&cpuwordmask != 0 {
-				break
-			}
+		for s[cpuwordidx]&cpuwordmask == 0 {
 			cpuno++
 			cpuwordmask <<= 1
 		}
@@ -333,7 +324,7 @@ findNextCPUInWord:
 	}
 }
 
-// SystemDbusBytes returns the set as a slice of bytes in little-endian format
+// SystemdDbusBytes returns the set as a slice of bytes in little-endian format
 // as required by systemd's D-Bus API.
 //
 // Please note that the byte slice is always in little-endian format with CPUs

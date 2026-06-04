@@ -23,16 +23,16 @@ import (
 var _ = Describe("online cpus", func() {
 
 	It("returns an empty list when the online cpu list cannot be accessed", func() {
-		Expect(online("_test/online")).To(Equal(List{}))
+		Expect(online("_testdata/online")).To(Equal(List{}))
 	})
 
 	It("returns an empty list when the online cpu list is empty or broken", func() {
-		Expect(online("_test/online/empty")).To(Equal(List{}))
-		Expect(online("_test/online/broken")).To(Equal(List{}))
+		Expect(online("_testdata/online/empty")).To(Equal(List{}))
+		Expect(online("_testdata/online/broken")).To(Equal(List{}))
 	})
 
 	It("correctly reads the online cpu list", func() {
-		Expect(online("_test/online/1,3-42")).To(
+		Expect(online("_testdata/online/1,3-42")).To(
 			Equal(Successful(NewList([]byte("1,3-42")))))
 	})
 
