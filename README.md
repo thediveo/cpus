@@ -4,7 +4,6 @@
 [![GitHub](https://img.shields.io/github/license/thediveo/cpus)](https://img.shields.io/github/license/thediveo/cpus)
 ![build and test](https://github.com/thediveo/cpus/actions/workflows/buildandtest.yaml/badge.svg?branch=master)
 ![Coverage](https://img.shields.io/badge/Coverage-96.7%25-brightgreen)
-[![Go Report Card](https://goreportcard.com/badge/github.com/thediveo/cpus)](https://goreportcard.com/report/github.com/thediveo/cpus)
 
 `cpus` is a small Go module for dealing with CPU lists and sets, as used
 throughout several places in Linux, such as syscalls and inside `procfs` pseudo
