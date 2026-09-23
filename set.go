@@ -46,6 +46,8 @@ const (
 	elementBytesSize = uint64(unsafe.Sizeof([1]Element{}))
 	elementBitSize   = uint(elementBytesSize * 8)
 
+	elementBytesMask = elementBytesSize - 1
+
 	allOnes = ^Element(0)
 )
 
@@ -83,13 +85,29 @@ func (s Set) AddRange(from, to uint) Set {
 	if from > to {
 		panic(fmt.Sprintf("invalid range %d-%d", from, to))
 	}
-	setLen := max(to/elementBitSize+1, uint(len(s))*elementBitSize)
+	setLen := max(to/elementBitSize+1, uint(len(s)))
 	set := make(Set, setLen)
 	copy(set[0:len(s)], s)
 	for cpu := from; cpu <= to; cpu++ {
 		set[setBitIndex(cpu)] |= setBitMask(cpu)
 	}
 	return set
+}
+
+// addRange adds the CPU(s) from the specified range to this Set.
+func (s *Set) addRange(from, to uint) {
+	if from > to {
+		panic(fmt.Sprintf("invalid range %d-%d", from, to))
+	}
+	rangeLen := to/elementBitSize + 1
+	if rangeLen > uint(len(*s)) {
+		set := make(Set, rangeLen)
+		copy(set[0:len(*s)], *s)
+		*s = set
+	}
+	for cpu := from; cpu <= to; cpu++ {
+		(*s)[setBitIndex(cpu)] |= setBitMask(cpu)
+	}
 }
 
 // IsOverlapping returns true if this Set and another overlap, otherwise false.
@@ -346,4 +364,17 @@ func (s Set) SystemdDbusBytes() []byte {
 	}
 	slices.Reverse(b)
 	return bytes.TrimRight(b, "\000")
+}
+
+// SystemDbusSet returns a set from the passed slice of bytes in little-endian
+// format as used in systemd's D-Bus API. It preserves nil-ness.
+func SystemDbusSet(ay []byte) Set {
+	if ay == nil {
+		return nil
+	}
+	s := make(Set, (len(ay)+int(elementBytesMask))/int(elementBytesSize))
+	for idx, b := range ay {
+		s[idx/int(elementBytesSize)] |= Element(b) << (int(elementBytesSize) * (idx & int(elementBytesMask)))
+	}
+	return s
 }

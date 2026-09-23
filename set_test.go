@@ -16,6 +16,7 @@ package cpus
 
 import (
 	"bytes"
+	"fmt"
 	"iter"
 	"os"
 	"runtime"
@@ -213,9 +214,15 @@ var _ = Describe("cpu sets", func() {
 			Entry(nil, 128, 128, 3),
 		)
 
+		It("extends to just the bare minimum of words", func() {
+			Expect(Set{}.
+				AddRange(elementBitSize, elementBitSize).
+				AddRange(1, 1)).To(BeEquivalentTo([]Element{2, 1}))
+		})
+
 	})
 
-	DescribeTable("systemd D-Bus CPU set byte arrays",
+	DescribeTable("converting into systemd D-Bus CPU set byte arrays",
 		func(list string, expected []byte) {
 			l := Successful(NewList([]byte(list)))
 			actual := l.Set().SystemdDbusBytes()
@@ -227,4 +234,27 @@ var _ = Describe("cpu sets", func() {
 		Entry(nil, "64,68,127-128", []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x01}),
 	)
 
+	DescribeTable("from systemd D-Bus CPU sets byte arrays",
+		func(ay []byte, set Set) {
+			if set == nil {
+				Expect(SystemDbusSet(ay)).To(BeNil())
+				return
+			}
+			Expect(SystemDbusSet(ay)).To(BeEquivalentTo(set))
+		},
+		Entry(nil, nil, nil),
+		Entry(nil, []byte{}, MustSet("")),
+		Entry(nil, []byte{0x02}, MustSet("1")),
+		Entry(nil, []byte{0x02, 0x01}, MustSet("1,8")),
+		Entry(nil, []byte{0x02, 0x01, 0, 0, 0, 0, 0, 0, 0x01}, MustSet("1,8,64")),
+	)
+
 })
+
+func MustSet(text string) Set {
+	list, err := NewList([]byte(text))
+	if err != nil {
+		panic(fmt.Sprintf("invalid list: %q", text))
+	}
+	return list.Set()
+}

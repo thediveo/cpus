@@ -3,7 +3,7 @@
 [![PkgGoDev](https://img.shields.io/badge/-reference-blue?logo=go&logoColor=white&labelColor=505050)](https://pkg.go.dev/github.com/thediveo/cpus)
 [![GitHub](https://img.shields.io/github/license/thediveo/cpus)](https://img.shields.io/github/license/thediveo/cpus)
 ![build and test](https://github.com/thediveo/cpus/actions/workflows/buildandtest.yaml/badge.svg?branch=master)
-![Coverage](https://img.shields.io/badge/Coverage-96.7%25-brightgreen)
+![Coverage](https://img.shields.io/badge/Coverage-96.8%25-brightgreen)
 
 `cpus` is a small Go module for dealing with CPU lists and sets, as used
 throughout several places in Linux, such as syscalls and inside `procfs` pseudo
