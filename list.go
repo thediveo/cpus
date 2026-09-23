@@ -156,10 +156,10 @@ func (l List) Set() Set {
 		return Set{}
 	}
 	// Do last range first to allocate only once.
-	var s Set
+	s := Set{}
 	for i := range l {
 		r := l[len(l)-i-1]
-		s = s.AddRange(r[0], r[1])
+		s.addRange(r[0], r[1])
 	}
 	return s
 }
