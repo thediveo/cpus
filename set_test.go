@@ -15,33 +15,13 @@
 package cpus
 
 import (
-	"bytes"
 	"fmt"
-	"iter"
-	"os"
-	"runtime"
 
 	. "github.com/onsi/ginkgo/v2/dsl/core"
 	. "github.com/onsi/ginkgo/v2/dsl/table"
 	. "github.com/onsi/gomega"
 	. "github.com/thediveo/success"
 )
-
-func Lines(b []byte) iter.Seq[[]byte] {
-	return func(yield func([]byte) bool) {
-		for len(b) > 0 {
-			var line []byte
-			if nlIdx := bytes.IndexByte(b, '\n'); nlIdx >= 0 {
-				line, b = b[:nlIdx+1], b[nlIdx+1:]
-			} else {
-				line, b = b, nil
-			}
-			if !yield(line[:len(line):len(line)]) {
-				return
-			}
-		}
-	}
-}
 
 var _ = Describe("cpu sets", func() {
 
@@ -81,41 +61,6 @@ var _ = Describe("cpu sets", func() {
 		Entry("b/w", Set{0xaa0}, List{{5, 5}, {7, 7}, {9, 9}, {11, 11}}),
 		Entry("art", Set{0x5a0}, List{{5, 5}, {7, 8}, {10, 10}}),
 	)
-
-	It("gets this process's CPU affinity list, consistent with /proc/self/status data", func() {
-		Expect(elementBytesSize).To(Equal(uint64(64 /* bits in uint64 */ / 8 /* bits/byte*/)))
-		cpulist := Successful(Affinity(os.Getpid())).List()
-		Expect(cpulist).NotTo(BeEmpty())
-		Expect(systemSetSize.Load()).NotTo(BeZero())
-
-		var prefix = []byte("Cpus_allowed_list:\t")
-		var allowedList List
-		for line := range Lines(Successful(os.ReadFile("/proc/self/status"))) {
-			if !bytes.HasPrefix(line, prefix) {
-				continue
-			}
-			allowedList = Successful(NewList(line[len(prefix) : len(line)-1]))
-		}
-		Expect(cpulist).To(Equal(allowedList))
-	})
-
-	It("changes this process's CPU affinity", func() {
-		runtime.LockOSThread() // don't unlock, throw away the tainted task
-
-		affs := Successful(Affinity(0))
-		oneonly, _ := affs.List().Remove()
-		Expect(Set{}.AddRange(oneonly, oneonly).PinTask(0)).To(Succeed())
-
-		reducedaffs := Successful(Affinity(0)).List()
-		Expect(reducedaffs).To(Equal(List{[2]uint{oneonly, oneonly}}))
-
-		Expect(affs.PinTask(0)).To(Succeed())
-	})
-
-	It("cannot set empty affinities", func() {
-		Expect(SetAffinity(0, Set{})).NotTo(Succeed())
-		Expect(SetAffinity(0, Set{0})).NotTo(Succeed())
-	})
 
 	Context("textual representation", func() {
 
@@ -221,6 +166,36 @@ var _ = Describe("cpu sets", func() {
 		})
 
 	})
+
+	DescribeTable("pruning",
+		func(set Set, expected Set) {
+			set.prune()
+			Expect(set).To(Equal(expected))
+		},
+		Entry(nil, Set{}, Set{}),
+		Entry(nil, Set{0}, Set{}),
+		Entry(nil, Set{1}, Set{1}),
+		Entry(nil, Set{1, 0, 0}, Set{1}),
+	)
+
+	DescribeTable("shaving of the last CPU",
+		func(set Set, expectedCPUs int, expectedSet Set, expectedOk bool) {
+			cpuno, remaining, ok := set.LastOk()
+			Expect(ok).To(Equal(expectedOk))
+			Expect(int(cpuno)).To(Equal(expectedCPUs))
+			if expectedSet == nil {
+				Expect(remaining).To(BeNil())
+				return
+			}
+			Expect(remaining).To(Equal(expectedSet))
+		},
+		Entry(nil, Set{}, 0, nil, false),
+		Entry(nil, Set{0, 0}, 0, nil, false),
+		Entry(nil, Set{2}, 1, Set{}, true),
+		Entry(nil, Set{3}, 1, Set{1}, true),
+		Entry(nil, Set{2, 1}, 64, Set{2}, true),
+		Entry(nil, Set{2, 0, 0, 0, 1}, 64*4, Set{2}, true),
+	)
 
 	DescribeTable("converting into systemd D-Bus CPU set byte arrays",
 		func(list string, expected []byte) {

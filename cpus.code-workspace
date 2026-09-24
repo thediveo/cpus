@@ -18,9 +18,6 @@
 		"go.testFlags": [
 			"-v",
 			"-race",
-			"--",
-			"-ginkgo.v",
-			"-ginkgo.no-color"
 		],
 		"gopls": {
 			"ui.semanticTokens": true,
